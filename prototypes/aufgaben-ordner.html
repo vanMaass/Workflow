@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aufgaben (Ordner) | Workflow</title>
+  <style>
+    :root { --ink: #37352f; --muted: #787774; --line: #e9e9e7; --paper: #ffffff; --side: #f7f7f5; --soft: #eeeeec; --accent: #2f2f2d; --on-accent: #fff; --drop: #e4efe9; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #e8e8e6; --muted: #aaa9a5; --line: #393936; --paper: #191919; --side: #20201f; --soft: #2d2d2b; --accent: #e6e6e3; --on-accent: #1f1f1e; --drop: #26332d; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; overflow: hidden; color: var(--ink); background: var(--paper); font-family: Georgia, "Times New Roman", serif; }
+    button, input { font: inherit; color: inherit; } button { cursor: pointer; }
+    .page { display: flex; flex-direction: column; height: 100vh; padding: 36px clamp(24px, 6vw, 88px) 0; }
+    header { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
+    .eyebrow { margin: 0; color: var(--muted); font: bold 11px Arial, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; }
+    h1 { margin: 4px 0 0; font-size: 36px; font-weight: normal; line-height: 1.1; }
+    .primary { padding: 9px 14px; color: var(--on-accent); border: 0; border-radius: 5px; background: var(--accent); font: 14px Arial, sans-serif; }
+
+    .workspace { display: grid; grid-template-columns: 250px minmax(0, 1fr); flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+
+    /* Ordnerliste wie OneNote-Abschnitte */
+    .folders { display: flex; flex-direction: column; gap: 3px; padding: 18px 14px 18px 0; border-right: 1px solid var(--line); overflow-y: auto; }
+    .folders-title { margin: 0 0 8px 10px; color: var(--muted); font: bold 11px Arial, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; }
+    .folder { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px 11px 14px; border: 1px solid transparent; border-radius: 6px; background: transparent; text-align: left; font-size: 17px; transition: background .12s, border-color .12s; }
+    .folder::before { content: ""; width: 4px; align-self: stretch; border-radius: 2px; background: var(--bar, var(--line)); }
+    .folder:hover { background: var(--soft); }
+    .folder.active { background: var(--soft); font-weight: bold; }
+    .folder.drop { border: 1px dashed var(--accent); background: var(--drop); }
+    .folder .name { flex: 1; }
+    .folder .count { min-width: 24px; padding: 1px 7px; color: var(--muted); border-radius: 10px; background: var(--paper); font: 12px Arial, sans-serif; text-align: center; }
+    .folder[data-status="Inbox"] { --bar: #9a9a96; }
+    .folder[data-status="Heute"] { --bar: var(--accent); }
+    .folder[data-status="Demnaechst"] { --bar: #7d8fa3; }
+    .folder[data-status="Erledigt"] { --bar: #b9b9b5; }
+    .hint { margin: auto 10px 0; color: var(--muted); font: 12px/1.5 Arial, sans-serif; }
+
+    /* Aufgabenliste des gewaehlten Ordners */
+    .pane { display: flex; flex-direction: column; min-width: 0; padding: 18px 0 0 clamp(18px, 3vw, 40px); overflow-y: auto; }
+    .pane-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+    .pane-head h2 { margin: 0; font-size: 24px; font-weight: normal; }
+    .pane-head span { color: var(--muted); font: 13px Arial, sans-serif; }
+    ul { margin: 0; padding: 0; list-style: none; }
+    .task { position: relative; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 6px; border-top: 1px solid var(--line); cursor: grab; transition: opacity .15s; }
+    .task:first-child { border-top: 0; }
+    .task:hover { background: var(--side); }
+    .task.dragging { opacity: .35; }
+    .task.before { box-shadow: 0 -2px 0 var(--accent); }
+    .grip { color: var(--muted); font: 14px Arial, sans-serif; letter-spacing: -2px; opacity: 0; }
+    .task:hover .grip { opacity: 1; }
+    .check { appearance: none; flex: none; width: 18px; height: 18px; margin: 0; border: 1.5px solid #a8a8a4; border-radius: 3px; background: var(--paper); display: grid; place-content: center; }
+    .check:checked { background: var(--accent); border-color: var(--accent); }
+    .check:checked::after { content: "✓"; color: var(--on-accent); font: 11px/1 Arial, sans-serif; }
+    .title { flex: 1; font-size: 18px; }
+    .task.done .title { color: var(--muted); text-decoration: line-through; }
+    .more { position: relative; width: 28px; height: 28px; color: var(--muted); border: 0; border-radius: 4px; background: transparent; opacity: 0; font: 18px Arial, sans-serif; }
+    .task:hover .more, .more:focus-visible { opacity: 1; }
+    .more:hover { background: var(--soft); }
+    .menu { position: absolute; right: 6px; top: 40px; z-index: 5; min-width: 180px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); box-shadow: 0 8px 22px rgba(0, 0, 0, .16); }
+    .menu p { margin: 4px 8px 6px; color: var(--muted); font: bold 11px Arial, sans-serif; letter-spacing: 1px; text-transform: uppercase; }
+    .menu button { display: block; width: 100%; padding: 7px 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; font: 14px Arial, sans-serif; }
+    .menu button:hover { background: var(--soft); }
+    .add-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 6px; border-top: 1px solid var(--line); }
+    .add-row::before { content: "+"; width: 18px; color: var(--muted); font: 20px Arial, sans-serif; text-align: center; }
+    .add-row input { flex: 1; padding: 6px 0; border: 0; outline: none; background: transparent; font-size: 18px; }
+    .empty { padding: 28px 6px; color: var(--muted); font-size: 16px; }
+    .toast { position: fixed; bottom: 22px; left: 50%; display: none; align-items: center; gap: 14px; padding: 10px 14px; color: var(--paper); border-radius: 6px; background: var(--ink); transform: translateX(-50%); font: 13px Arial, sans-serif; }
+    .toast.visible { display: flex; }
+    .toast button { padding: 0; color: inherit; border: 0; background: transparent; text-decoration: underline; }
+
+    @media (max-width: 760px) {
+      .workspace { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .folders { flex-direction: row; padding: 10px 0; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
+      .folders-title, .hint { display: none; }
+      .folder { width: auto; white-space: nowrap; }
+      .pane { padding-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <p class="eyebrow">Alle Aufgaben</p>
+        <h1>Aufgaben</h1>
+      </div>
+      <button class="primary" id="add-top">+ Aufgabe</button>
+    </header>
+
+    <div class="workspace">
+      <nav class="folders" aria-label="Ordner" id="folders">
+        <p class="folders-title">Ordner</p>
+      </nav>
+
+      <section class="pane" aria-live="polite">
+        <div class="pane-head"><h2 id="pane-title"></h2><span id="pane-count"></span></div>
+        <ul id="list"></ul>
+        <div class="add-row"><input id="new-task" placeholder="Aufgabe hinzufügen" aria-label="Aufgabe hinzufügen"></div>
+        <div class="empty" id="empty" hidden></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo">Rückgängig</button></div>
+
+  <script>
+    const FOLDERS = [
+      { id: "Inbox", label: "Inbox", empty: "Alles eingeordnet. Neue Gedanken landen hier." },
+      { id: "Heute", label: "Heute", empty: "Noch nichts für heute. Zieh Aufgaben aus der Inbox hierher." },
+      { id: "Demnaechst", label: "Demnächst", empty: "Nichts für später vorgemerkt." },
+      { id: "Erledigt", label: "Erledigt", empty: "Noch nichts erledigt." },
+    ];
+    let tasks = [
+      { id: 1, title: "Steuerunterlagen sortieren", status: "Inbox" },
+      { id: 2, title: "Idee: Newsletter starten", status: "Inbox" },
+      { id: 3, title: "Projektvorschlag fertigstellen", status: "Heute" },
+      { id: 4, title: "Feedback für Entwurf einarbeiten", status: "Heute" },
+      { id: 5, title: "Team-Meeting vorbereiten", status: "Heute" },
+      { id: 6, title: "Angebot für Kunde B prüfen", status: "Demnaechst" },
+      { id: 7, title: "Website-Texte überarbeiten", status: "Demnaechst" },
+      { id: 8, title: "Rechnung versenden", status: "Erledigt" },
+    ];
+    let active = "Heute", dragId = null, undo = null, toastTimer, openMenu = null;
+    const $ = (id) => document.getElementById(id);
+    const label = (id) => FOLDERS.find((f) => f.id === id).label;
+
+    function move(id, status, beforeId = null) {
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+      const snapshot = tasks.map((t) => ({ ...t }));
+      task.status = status;
+      tasks = tasks.filter((t) => t.id !== id);
+      const index = beforeId ? tasks.findIndex((t) => t.id === beforeId) : -1;
+      tasks.splice(index === -1 ? tasks.length : index, 0, task);
+      if (snapshot.find((t) => t.id === id).status !== status) toast(`„${task.title}“ nach ${label(status)} verschoben`, snapshot);
+      render();
+    }
+
+    function toast(text, snapshot) {
+      undo = snapshot; $("toast-text").textContent = text; $("toast").classList.add("visible");
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("visible"), 5000);
+    }
+    $("toast-undo").onclick = () => { if (undo) tasks = undo; undo = null; $("toast").classList.remove("visible"); render(); };
+
+    function render() {
+      $("folders").querySelectorAll(".folder").forEach((n) => n.remove());
+      for (const f of FOLDERS) {
+        const btn = document.createElement("button");
+        btn.className = "folder" + (f.id === active ? " active" : "");
+        btn.dataset.status = f.id;
+        btn.innerHTML = `<span class="name">${f.label}</span><span class="count">${tasks.filter((t) => t.status === f.id).length}</span>`;
+        btn.onclick = () => { active = f.id; openMenu = null; render(); };
+        btn.ondragover = (e) => { if (dragId) { e.preventDefault(); btn.classList.add("drop"); } };
+        btn.ondragleave = () => btn.classList.remove("drop");
+        btn.ondrop = (e) => { e.preventDefault(); btn.classList.remove("drop"); move(dragId, f.id); dragId = null; };
+        $("folders").appendChild(btn);
+      }
+      const hint = $("folders").querySelector(".hint") || Object.assign(document.createElement("p"), { className: "hint" });
+      hint.textContent = "Tipp: Aufgaben auf einen Ordner ziehen, um sie zu verschieben.";
+      $("folders").appendChild(hint);
+
+      const items = tasks.filter((t) => t.status === active);
+      $("pane-title").textContent = label(active);
+      $("pane-count").textContent = items.length === 1 ? "1 Aufgabe" : `${items.length} Aufgaben`;
+      $("empty").hidden = items.length > 0;
+      $("empty").textContent = FOLDERS.find((f) => f.id === active).empty;
+      $("new-task").placeholder = active === "Heute" ? "Aufgabe für heute hinzufügen" : active === "Inbox" ? "Neue Aufgabe in die Inbox" : "Aufgabe hinzufügen";
+      $("new-task").closest(".add-row").hidden = active === "Erledigt";
+
+      const list = $("list"); list.innerHTML = "";
+      for (const t of items) {
+        const li = document.createElement("li");
+        li.className = "task" + (t.status === "Erledigt" ? " done" : "");
+        li.draggable = true;
+        li.innerHTML = `<span class="grip" aria-hidden="true">⋮⋮</span><input class="check" type="checkbox" aria-label="${t.title} erledigen" ${t.status === "Erledigt" ? "checked" : ""}><span class="title"></span><button class="more" aria-label="Verschieben nach …" aria-haspopup="menu">⋯</button>`;
+        li.querySelector(".title").textContent = t.title;
+        li.querySelector(".check").onchange = (e) => move(t.id, e.target.checked ? "Erledigt" : "Inbox");
+        li.ondragstart = (e) => { dragId = t.id; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(t.id)); setTimeout(() => li.classList.add("dragging"), 0); };
+        li.ondragend = () => { dragId = null; render(); };
+        li.ondragover = (e) => { if (dragId && dragId !== t.id) { e.preventDefault(); li.classList.add("before"); } };
+        li.ondragleave = () => li.classList.remove("before");
+        li.ondrop = (e) => { e.preventDefault(); move(dragId, active, t.id); dragId = null; };
+        li.querySelector(".more").onclick = (e) => { e.stopPropagation(); openMenu = openMenu === t.id ? null : t.id; render(); };
+        if (openMenu === t.id) {
+          const menu = document.createElement("div"); menu.className = "menu"; menu.setAttribute("role", "menu");
+          menu.innerHTML = "<p>Verschieben nach</p>";
+          for (const f of FOLDERS.filter((f) => f.id !== t.status)) {
+            const b = document.createElement("button"); b.setAttribute("role", "menuitem"); b.textContent = f.label;
+            b.onclick = () => { openMenu = null; move(t.id, f.id); };
+            menu.appendChild(b);
+          }
+          li.appendChild(menu);
+        }
+        list.appendChild(li);
+      }
+    }
+
+    $("new-task").onkeydown = (e) => {
+      if (e.key !== "Enter" || !e.target.value.trim()) return;
+      tasks.push({ id: Date.now(), title: e.target.value.trim(), status: active });
+      e.target.value = ""; render();
+    };
+    $("add-top").onclick = () => { if (active === "Erledigt") { active = "Inbox"; render(); } $("new-task").focus(); };
+    document.addEventListener("click", () => { if (openMenu !== null) { openMenu = null; render(); } });
+    render();
+  </script>
+</body>
+</html>

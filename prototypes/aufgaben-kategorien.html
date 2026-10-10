@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aufgaben (Kategorien-Spalte) | Workflow</title>
+  <style>
+    :root { --ink: #37352f; --muted: #787774; --line: #e9e9e7; --paper: #ffffff; --side: #f7f7f5; --cats: #f1f1ef; --soft: #e8e8e5; --accent: #2f2f2d; --on-accent: #fff; --drop: #e4efe9; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #e8e8e6; --muted: #aaa9a5; --line: #393936; --paper: #191919; --side: #20201f; --cats: #1d1d1c; --soft: #2d2d2b; --accent: #e6e6e3; --on-accent: #1f1f1e; --drop: #26332d; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; overflow: hidden; color: var(--ink); background: var(--paper); font-family: Georgia, "Times New Roman", serif; }
+    button, input { font: inherit; color: inherit; } button { cursor: pointer; }
+    .app { display: grid; grid-template-columns: 170px 250px minmax(0, 1fr); height: 100vh; }
+
+    /* 1. Hauptmenue (wie in der App) */
+    .menu { display: flex; flex-direction: column; gap: 2px; padding: 14px 8px; border-right: 1px solid var(--line); background: var(--side); font: 14px Arial, sans-serif; }
+    .menu button { padding: 7px 10px; border: 0; border-radius: 4px; background: transparent; text-align: left; }
+    .menu button.on { background: var(--soft); font-weight: bold; }
+    .mode { margin-top: auto; padding: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    .mode label { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+    .switch { position: relative; width: 34px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: var(--line); }
+    .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--paper); transition: transform .15s; }
+    .switch[aria-checked="true"] { background: var(--accent); }
+    .switch[aria-checked="true"]::after { transform: translateX(14px); background: var(--on-accent); }
+
+    /* 2. Kategorien-Spalte: direkt rechts neben dem Menue, buendig an der Kante */
+    .cats { display: flex; flex-direction: column; gap: 8px; padding: 18px 14px; border-right: 1px solid var(--line); background: var(--cats); overflow-y: auto; }
+    .cats h2 { margin: 2px 4px 6px; color: var(--muted); font: bold 11px Arial, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; }
+    .tile { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 14px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); text-align: left; transition: border-color .12s, background .12s, transform .12s; }
+    .tile:hover { border-color: var(--muted); }
+    .tile .label { font-size: 18px; }
+    .tile .num { font: bold 20px Arial, sans-serif; color: var(--muted); }
+    .tile.active { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+    .tile.active .num { color: var(--on-accent); }
+    .tile.drop { border: 1px dashed var(--accent); background: var(--drop); color: var(--ink); transform: scale(1.02); }
+    .tile .remove { position: absolute; top: -7px; right: -7px; display: none; width: 20px; height: 20px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); color: var(--muted); font: 12px/1 Arial, sans-serif; }
+    .tile.custom:hover .remove { display: block; }
+    .divider { height: 1px; margin: 6px 4px; background: var(--line); }
+    .add-cat { display: none; padding: 12px 14px; color: var(--muted); border: 1px dashed var(--muted); border-radius: 8px; background: transparent; text-align: left; font: 14px Arial, sans-serif; }
+    .add-cat:hover { color: var(--ink); border-color: var(--ink); }
+    .adv .add-cat { display: block; }
+    .cat-input { display: none; padding: 12px 14px; border: 1px solid var(--accent); border-radius: 8px; outline: none; background: var(--paper); font-size: 16px; }
+    .hint { margin: auto 4px 0; color: var(--muted); font: 12px/1.5 Arial, sans-serif; }
+
+    /* 3. Todos der gewaehlten Kategorie */
+    .todos { display: flex; flex-direction: column; min-width: 0; padding: 30px clamp(24px, 5vw, 72px) 0; overflow-y: auto; }
+    .todos header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+    .todos h1 { margin: 0; font-size: 34px; font-weight: normal; }
+    .todos header span { color: var(--muted); font: 13px Arial, sans-serif; }
+    ul { margin: 0; padding: 0; list-style: none; }
+    .todo { position: relative; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 6px; border-top: 1px solid var(--line); cursor: grab; transition: opacity .15s; }
+    .todo:hover { background: var(--side); }
+    .todo.dragging { opacity: .35; }
+    .check { appearance: none; flex: none; width: 18px; height: 18px; margin: 0; border: 1.5px solid #a8a8a4; border-radius: 3px; background: var(--paper); display: grid; place-content: center; }
+    .check:checked { background: var(--accent); border-color: var(--accent); }
+    .check:checked::after { content: "✓"; color: var(--on-accent); font: 11px/1 Arial, sans-serif; }
+    .title { flex: 1; font-size: 18px; }
+    .todo.done .title { color: var(--muted); text-decoration: line-through; }
+    .more { width: 28px; height: 28px; color: var(--muted); border: 0; border-radius: 4px; background: transparent; opacity: 0; font: 18px Arial, sans-serif; }
+    .todo:hover .more, .more:focus-visible { opacity: 1; }
+    .more:hover { background: var(--soft); }
+    .pop { position: absolute; right: 6px; top: 40px; z-index: 5; min-width: 180px; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); box-shadow: 0 8px 22px rgba(0, 0, 0, .16); }
+    .pop p { margin: 4px 8px 6px; color: var(--muted); font: bold 11px Arial, sans-serif; letter-spacing: 1px; text-transform: uppercase; }
+    .pop button { display: block; width: 100%; padding: 7px 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; font: 14px Arial, sans-serif; }
+    .pop button:hover { background: var(--soft); }
+    .add-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 6px; border-top: 1px solid var(--line); }
+    .add-row::before { content: "+"; width: 18px; color: var(--muted); font: 20px Arial, sans-serif; text-align: center; }
+    .add-row input { flex: 1; padding: 6px 0; border: 0; outline: none; background: transparent; font-size: 18px; }
+    .empty { padding: 28px 6px; color: var(--muted); font-size: 16px; }
+    .toast { position: fixed; bottom: 22px; left: 50%; display: none; align-items: center; gap: 14px; padding: 10px 14px; color: var(--paper); border-radius: 6px; background: var(--ink); transform: translateX(-50%); font: 13px Arial, sans-serif; }
+    .toast.visible { display: flex; }
+    .toast button { padding: 0; color: inherit; border: 0; background: transparent; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <nav class="menu" aria-label="Hauptnavigation">
+      <button>Heute</button>
+      <button class="on">Aufgaben</button>
+      <button>Notizen</button>
+      <button>Archiv</button>
+      <div class="mode">
+        <label>Advanced Mode
+          <button class="switch" id="mode" role="switch" aria-checked="false" aria-label="Advanced Mode"></button>
+        </label>
+        <p style="margin:6px 0 0">Nur für die Vorschau – in der App liegt der Schalter in den Einstellungen.</p>
+      </div>
+    </nav>
+
+    <aside class="cats" id="cats" aria-label="Kategorien">
+      <h2>Aufgaben</h2>
+      <div id="tiles" style="display:flex;flex-direction:column;gap:8px"></div>
+      <button class="add-cat" id="add-cat">+ Kategorie hinzufügen</button>
+      <input class="cat-input" id="cat-input" placeholder="Name der Kategorie" aria-label="Name der neuen Kategorie">
+      <p class="hint">Aufgaben auf ein Feld ziehen, um sie zu verschieben.</p>
+    </aside>
+
+    <main class="todos">
+      <header><h1 id="title"></h1><span id="count"></span></header>
+      <ul id="list"></ul>
+      <div class="add-row" id="add-row"><input id="new" aria-label="Aufgabe hinzufügen"></div>
+      <div class="empty" id="empty" hidden></div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="undo">Rückgängig</button></div>
+
+  <script>
+    const BASE = [
+      { id: "Inbox", label: "Inbox", empty: "Alles eingeordnet. Neue Gedanken landen hier." },
+      { id: "Heute", label: "Heute", empty: "Noch nichts für heute. Zieh Aufgaben aus der Inbox auf „Heute“." },
+      { id: "Demnaechst", label: "Demnächst", empty: "Nichts für später vorgemerkt." },
+      { id: "Erledigt", label: "Erledigt", empty: "Noch nichts erledigt." },
+    ];
+    let cats = [...BASE];
+    let todos = [
+      { id: 1, title: "Steuerunterlagen sortieren", cat: "Inbox" },
+      { id: 2, title: "Idee: Newsletter starten", cat: "Inbox" },
+      { id: 3, title: "Projektvorschlag fertigstellen", cat: "Heute" },
+      { id: 4, title: "Feedback für Entwurf einarbeiten", cat: "Heute" },
+      { id: 5, title: "Team-Meeting vorbereiten", cat: "Heute" },
+      { id: 6, title: "Angebot für Kunde B prüfen", cat: "Demnaechst" },
+      { id: 7, title: "Rechnung versenden", cat: "Erledigt" },
+    ];
+    let active = "Heute", advanced = false, dragId = null, openPop = null, undoState = null, timer;
+    const $ = (id) => document.getElementById(id);
+    // Easy Mode blendet eigene Kategorien aus, ohne Daten zu loeschen: ihre Aufgaben erscheinen dann in der Inbox.
+    const visibleCats = () => cats.filter((c) => !c.custom || advanced);
+    const eff = (t) => (visibleCats().some((c) => c.id === t.cat) ? t.cat : "Inbox");
+    const labelOf = (id) => cats.find((c) => c.id === id)?.label ?? id;
+    const snapshot = () => ({ cats: cats.map((c) => ({ ...c })), todos: todos.map((t) => ({ ...t })) });
+
+    function toast(text, snap) {
+      undoState = snap; $("toast-text").textContent = text; $("toast").classList.add("visible");
+      clearTimeout(timer); timer = setTimeout(() => $("toast").classList.remove("visible"), 5000);
+    }
+    $("undo").onclick = () => { if (undoState) { cats = undoState.cats; todos = undoState.todos; } undoState = null; $("toast").classList.remove("visible"); render(); };
+
+    function move(id, cat) {
+      const t = todos.find((x) => x.id === id);
+      if (!t || eff(t) === cat) return;
+      const snap = snapshot(); t.cat = cat;
+      toast(`„${t.title}“ nach ${labelOf(cat)} verschoben`, snap); render();
+    }
+
+    function render() {
+      $("app").classList.toggle("adv", advanced);
+      $("mode").setAttribute("aria-checked", advanced);
+      const tiles = $("tiles"); tiles.innerHTML = "";
+      visibleCats().forEach((c, i) => {
+        if (i === BASE.length) { const d = document.createElement("div"); d.className = "divider"; tiles.appendChild(d); }
+        const b = document.createElement("button");
+        b.className = "tile" + (c.id === active ? " active" : "") + (c.custom ? " custom" : "");
+        b.innerHTML = `<span class="label"></span><span class="num">${todos.filter((t) => eff(t) === c.id).length}</span>`;
+        b.querySelector(".label").textContent = c.label;
+        b.onclick = () => { active = c.id; openPop = null; render(); };
+        b.ondragover = (e) => { if (dragId) { e.preventDefault(); b.classList.add("drop"); } };
+        b.ondragleave = () => b.classList.remove("drop");
+        b.ondrop = (e) => { e.preventDefault(); move(dragId, c.id); dragId = null; };
+        if (c.custom) {
+          const x = document.createElement("span"); x.className = "remove"; x.textContent = "✕"; x.title = "Kategorie entfernen (Aufgaben wandern in die Inbox)";
+          x.onclick = (e) => {
+            e.stopPropagation(); const snap = snapshot();
+            todos.forEach((t) => { if (t.cat === c.id) t.cat = "Inbox"; });
+            cats = cats.filter((k) => k.id !== c.id); if (active === c.id) active = "Inbox";
+            toast(`Kategorie „${c.label}“ entfernt – Aufgaben liegen jetzt in der Inbox`, snap); render();
+          };
+          b.appendChild(x);
+        }
+        tiles.appendChild(b);
+      });
+
+      const cur = visibleCats().find((c) => c.id === active);
+      const items = todos.filter((t) => eff(t) === active);
+      $("title").textContent = cur.label;
+      $("count").textContent = items.length === 1 ? "1 Aufgabe" : `${items.length} Aufgaben`;
+      $("empty").hidden = items.length > 0;
+      $("empty").textContent = cur.empty ?? "Noch keine Aufgaben in dieser Kategorie.";
+      $("add-row").hidden = active === "Erledigt";
+      $("new").placeholder = active === "Heute" ? "Aufgabe für heute hinzufügen" : "Aufgabe hinzufügen";
+
+      const list = $("list"); list.innerHTML = "";
+      for (const t of items) {
+        const li = document.createElement("li");
+        li.className = "todo" + (eff(t) === "Erledigt" ? " done" : ""); li.draggable = true;
+        li.innerHTML = `<input class="check" type="checkbox" ${eff(t) === "Erledigt" ? "checked" : ""}><span class="title"></span><button class="more" aria-label="Verschieben nach …">⋯</button>`;
+        li.querySelector(".title").textContent = t.title;
+        li.querySelector(".check").setAttribute("aria-label", `${t.title} erledigen`);
+        li.querySelector(".check").onchange = (e) => move(t.id, e.target.checked ? "Erledigt" : "Inbox");
+        li.ondragstart = (e) => { dragId = t.id; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(t.id)); setTimeout(() => li.classList.add("dragging"), 0); };
+        li.ondragend = () => { dragId = null; render(); };
+        li.querySelector(".more").onclick = (e) => { e.stopPropagation(); openPop = openPop === t.id ? null : t.id; render(); };
+        if (openPop === t.id) {
+          const pop = document.createElement("div"); pop.className = "pop"; pop.innerHTML = "<p>Verschieben nach</p>";
+          for (const c of visibleCats().filter((c) => c.id !== eff(t))) {
+            const b = document.createElement("button"); b.textContent = c.label; b.onclick = () => { openPop = null; move(t.id, c.id); }; pop.appendChild(b);
+          }
+          li.appendChild(pop);
+        }
+        list.appendChild(li);
+      }
+    }
+
+    $("new").onkeydown = (e) => {
+      if (e.key !== "Enter" || !e.target.value.trim()) return;
+      todos.push({ id: Date.now(), title: e.target.value.trim(), cat: active }); e.target.value = ""; render();
+    };
+    $("mode").onclick = () => {
+      advanced = !advanced;
+      if (!visibleCats().some((c) => c.id === active)) active = "Inbox";
+      render();
+    };
+    $("add-cat").onclick = () => { $("add-cat").style.display = "none"; $("cat-input").style.display = "block"; $("cat-input").focus(); };
+    $("cat-input").onkeydown = (e) => {
+      if (e.key === "Escape") { e.target.value = ""; }
+      if (e.key === "Enter" && e.target.value.trim()) {
+        const id = "k" + Date.now(); cats.push({ id, label: e.target.value.trim(), custom: true }); active = id; e.target.value = "";
+      }
+      if (e.key === "Enter" || e.key === "Escape") { $("cat-input").style.display = "none"; $("add-cat").style.display = ""; render(); }
+    };
+    document.addEventListener("click", () => { if (openPop !== null) { openPop = null; render(); } });
+    render();
+  </script>
+</body>
+</html>
